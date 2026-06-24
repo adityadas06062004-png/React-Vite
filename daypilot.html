@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DayPilot - Daily Assistant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a; --border: #2e3248;
+    --text: #e8eaf6; --text2: #8b90b8; --accent: #6c63ff; --accent2: #8b83ff;
+    --green: #4caf7d; --yellow: #f0b429; --red: #ef5350; --radius: 12px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+  .logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .date-chip { background: var(--surface2); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; font-size: 13px; color: var(--text2); }
+  .main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 20px 24px; flex: 1; overflow: auto; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .panel-body { padding: 16px 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .add-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .add-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; transition: border-color 0.2s; }
+  .add-input:focus { border-color: var(--accent); }
+  .add-input::placeholder { color: var(--text2); }
+  .add-btn { background: var(--accent); border: none; border-radius: 8px; padding: 8px 14px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .add-btn:hover { background: var(--accent2); }
+  .task-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); transition: all 0.2s; }
+  .task-item.done { opacity: 0.45; }
+  .task-item.done .task-text { text-decoration: line-through; color: var(--text2); }
+  .check-btn { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); background: transparent; cursor: pointer; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .check-btn.checked { background: var(--green); border-color: var(--green); color: #fff; font-size: 11px; }
+  .task-text { font-size: 13px; flex: 1; line-height: 1.4; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; flex-shrink: 0; }
+  .badge.low { background: rgba(76,175,125,0.15); color: var(--green); }
+  .badge.medium { background: rgba(240,180,41,0.15); color: var(--yellow); }
+  .badge.urgent { background: rgba(239,83,80,0.15); color: var(--red); }
+  .del-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s; padding: 2px 4px; }
+  .task-item:hover .del-btn { opacity: 1; }
+  .reminder-item { padding: 10px 12px; background: var(--surface2); border-radius: 8px; border-left: 3px solid var(--accent); border-top: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .reminder-item.urgent-rem { border-left-color: var(--red); }
+  .reminder-item.medium-rem { border-left-color: var(--yellow); }
+  .reminder-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .reminder-time { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+  .time-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none; width: 110px; }
+  .time-input:focus { border-color: var(--accent); }
+  .pri-select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 8px; color: var(--text); font-size: 13px; outline: none; cursor: pointer; }
+  .decision-box { display: flex; flex-direction: column; gap: 10px; }
+  .dec-label { font-size: 12px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .dec-textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 13px; outline: none; resize: none; font-family: inherit; line-height: 1.5; transition: border-color 0.2s; }
+  .dec-textarea:focus { border-color: var(--accent); }
+  .analyze-btn { background: linear-gradient(135deg, var(--accent), #9c6bff); border: none; border-radius: 8px; padding: 10px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+  .analyze-btn:hover { opacity: 0.88; }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .result-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.7; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff4; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { color: var(--text2); font-size: 13px; text-align: center; padding: 20px 0; }
+  .count-chip { background: var(--surface2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 10px; font-size: 12px; color: var(--text2); }
+  .disclaimer { font-size: 11px; color: var(--text2); text-align: center; }
+  @media (max-width: 800px) { .main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🧭</div>
+      DayPilot
+    </div>
+    <div class="date-chip" id="datechip"></div>
+  </header>
+  <div class="main">
+    <!-- TASKS -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">✅ Daily Tasks</div>
+        <span class="count-chip" id="task-count">0 left</span>
+      </div>
+      <div class="panel-body">
+        <div class="add-row">
+          <input class="add-input" id="task-input" placeholder="Add a task..." />
+          <select class="pri-select" id="task-pri">
+            <option value="low">Low</option>
+            <option value="medium" selected>Med</option>
+            <option value="urgent">🔴 Urgent</option>
+          </select>
+          <button class="add-btn" onclick="addTask()">+</button>
+        </div>
+        <div id="task-list"></div>
+      </div>
+    </div>
+    <!-- REMINDERS -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🔔 Reminders</div>
+        <span class="count-chip" id="rem-count">0</span>
+      </div>
+      <div class="panel-body">
+        <div class="add-row">
+          <input class="add-input" id="rem-input" placeholder="Reminder text..." />
+          <input class="time-input" id="rem-time" type="time" />
+        </div>
+        <div class="add-row">
+          <select class="pri-select" id="rem-pri" style="flex:1">
+            <option value="low">Low Priority</option>
+            <option value="medium" selected>Medium</option>
+            <option value="urgent">🔴 Urgent</option>
+          </select>
+          <button class="add-btn" onclick="addReminder()">Set</button>
+        </div>
+        <div id="rem-list"></div>
+      </div>
+    </div>
+    <!-- DECISION HELPER -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">⚖️ Decision Helper</div>
+      </div>
+      <div class="panel-body">
+        <div class="decision-box">
+          <div class="dec-label">Describe your dilemma</div>
+          <textarea class="dec-textarea" id="dec-input" rows="3" placeholder="e.g. Should I switch jobs now or wait 6 months for the promotion?"></textarea>
+          <div class="add-row">
+            <input class="add-input" id="opt-a" placeholder="Option A (optional)" />
+            <input class="add-input" id="opt-b" placeholder="Option B (optional)" />
+          </div>
+          <button class="analyze-btn" id="analyze-btn" onclick="analyzeDecision()">⚡ Analyze Decision</button>
+          <div class="disclaimer">For guidance only. Consult trusted advisors for major decisions.</div>
+          <div id="dec-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Date display
+const now = new Date();
+document.getElementById('datechip').textContent = now.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+// ── TASKS ──
+let tasks = JSON.parse(localStorage.getItem('dp_tasks') || '[]');
+function saveTasks() { localStorage.setItem('dp_tasks', JSON.stringify(tasks)); }
+function renderTasks() {
+  const list = document.getElementById('task-list');
+  const pending = tasks.filter(t => !t.done).length;
+  document.getElementById('task-count').textContent = pending + ' left';
+  if (!tasks.length) { list.innerHTML = '<div class="empty">✨ No tasks yet — you\'re all clear!</div>'; return; }
+  list.innerHTML = tasks.map((t, i) => `
+    <div class="task-item ${t.done ? 'done' : ''}">
+      <button class="check-btn ${t.done ? 'checked' : ''}" onclick="toggleTask(${i})">${t.done ? '✓' : ''}</button>
+      <span class="task-text">${escHtml(t.text)}</span>
+      <span class="badge ${t.priority}">${t.priority}</span>
+      <button class="del-btn" onclick="delTask(${i})">✕</button>
+    </div>`).join('');
+}
+function addTask() {
+  const inp = document.getElementById('task-input');
+  const pri = document.getElementById('task-pri').value;
+  if (!inp.value.trim()) return;
+  tasks.unshift({ text: inp.value.trim(), priority: pri, done: false });
+  inp.value = ''; saveTasks(); renderTasks();
+}
+function toggleTask(i) { tasks[i].done = !tasks[i].done; saveTasks(); renderTasks(); }
+function delTask(i) { tasks.splice(i, 1); saveTasks(); renderTasks(); }
+document.getElementById('task-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+renderTasks();
+
+// ── REMINDERS ──
+let reminders = JSON.parse(localStorage.getItem('dp_reminders') || '[]');
+function saveReminders() { localStorage.setItem('dp_reminders', JSON.stringify(reminders)); }
+function renderReminders() {
+  const list = document.getElementById('rem-list');
+  document.getElementById('rem-count').textContent = reminders.length;
+  if (!reminders.length) { list.innerHTML = '<div class="empty">🔕 No reminders set</div>'; return; }
+  const sorted = [...reminders].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  list.innerHTML = sorted.map((r, idx) => `
+    <div class="reminder-item ${r.priority === 'urgent' ? 'urgent-rem' : r.priority === 'medium' ? 'medium-rem' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="reminder-title">${escHtml(r.text)}</div>
+        <button class="del-btn" style="opacity:1" onclick="delReminder(${idx})">✕</button>
+      </div>
+      <div class="reminder-time">
+        ${r.time ? '🕐 ' + r.time : '⏰ No time set'}
+        &nbsp;·&nbsp;<span class="badge ${r.priority}">${r.priority}</span>
+      </div>
+    </div>`).join('');
+}
+function addReminder() {
+  const inp = document.getElementById('rem-input');
+  const time = document.getElementById('rem-time').value;
+  const pri = document.getElementById('rem-pri').value;
+  if (!inp.value.trim()) return;
+  reminders.push({ text: inp.value.trim(), time, priority: pri });
+  inp.value = ''; document.getElementById('rem-time').value = '';
+  saveReminders(); renderReminders();
+}
+function delReminder(i) { reminders.splice(i, 1); saveReminders(); renderReminders(); }
+document.getElementById('rem-input').addEventListener('keydown', e => { if (e.key === 'Enter') addReminder(); });
+renderReminders();
+
+// ── DECISION HELPER ──
+async function analyzeDecision() {
+  const dilemma = document.getElementById('dec-input').value.trim();
+  const optA = document.getElementById('opt-a').value.trim();
+  const optB = document.getElementById('opt-b').value.trim();
+  if (!dilemma) { alert('Please describe your dilemma first.'); return; }
+  const btn = document.getElementById('analyze-btn');
+  const result = document.getElementById('dec-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+  result.innerHTML = '';
+  const prompt = `You are a calm, rational decision-making advisor. A user needs help with this dilemma:\n\n"${dilemma}"\n${optA ? '\nOption A: ' + optA : ''}${optB ? '\nOption B: ' + optB : ''}\n\nGive a structured, balanced analysis:\n1. Pros of each option (2-3 bullets each)\n2. Cons of each option (2-3 bullets each)\n3. A clear, practical verdict with brief reasoning\n\nBe concise and honest. IMPORTANT: If the dilemma involves anything illegal, unethical, harmful, or suicidal, politely decline and suggest professional help instead. Use emojis for readability.`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(b => b.text || '').join('') || 'No response received.';
+    result.innerHTML = `<div class="result-box">${text.replace(/\n/g,'<br/>')}</div>`;
+  } catch(e) {
+    result.innerHTML = `<div class="result-box" style="color:var(--red)">⚠️ Could not connect. Check your API key setup.</div>`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '⚡ Analyze Decision';
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
