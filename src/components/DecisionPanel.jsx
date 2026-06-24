@@ -1,6 +1,17 @@
 import { useState } from "react";
 
-const SAFETY_KEYWORDS = ["kill", "suicide", "harm", "illegal", "weapon", "drug", "steal", "fraud", "cheat", "sex"];
+const SAFETY_KEYWORDS = [
+  "kill",
+  "suicide",
+  "harm",
+  "illegal",
+  "weapon",
+  "drug",
+  "steal",
+  "fraud",
+  "cheat",
+  "sex",
+];
 
 function isSafe(text) {
   const lower = text.toLowerCase();
@@ -15,8 +26,11 @@ export default function DecisionPanel() {
 
   const analyze = async () => {
     if (!dilemma.trim()) return;
+
     if (!isSafe(dilemma)) {
-      setError("This topic falls outside the scope of this assistant. Please ask about everyday decisions.");
+      setError(
+        "This topic falls outside the scope of this assistant. Please ask about everyday decisions."
+      );
       return;
     }
 
@@ -24,39 +38,74 @@ export default function DecisionPanel() {
     setError("");
     setResult(null);
 
-    const prompt = `You are a calm, ethical daily life advisor. A user is facing this decision or situation:
+    const prompt = `
+You are a calm, ethical daily life advisor.
+
+A user is facing this decision:
 
 "${dilemma}"
 
-Respond ONLY with a JSON object — no markdown, no explanation outside the JSON. Format:
+Respond ONLY with valid JSON.
+
 {
   "summary": "one sentence framing of the decision",
   "pros": ["pro 1", "pro 2", "pro 3"],
   "cons": ["con 1", "con 2", "con 3"],
-  "recommendation": "a clear, calm 1-2 sentence recommendation",
+  "recommendation": "a clear recommendation",
   "considerations": ["consideration 1", "consideration 2"]
 }
 
-Keep each item concise (under 12 words). Be practical, grounded, and non-judgmental. Never recommend anything unethical, illegal, or harmful.`;
+Do not include markdown.
+Do not include code fences.
+Return JSON only.
+`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: prompt }],
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Gemini API Error (${response.status}): ${errorText}`
+        );
+      }
 
       const data = await response.json();
-      const text = data.content?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g, "").trim();
+
+      const text =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+      if (!text) {
+        throw new Error("Gemini returned an empty response.");
+      }
+
+      let clean = text.trim();
+
+      clean = clean.replace(/```json/g, "");
+      clean = clean.replace(/```/g, "");
+      clean = clean.trim();
+
       const parsed = JSON.parse(clean);
+
       setResult(parsed);
     } catch (err) {
-      setError("Could not analyze — please try again.");
+      console.error("Decision Analysis Error:", err);
+      setError(err.message || "Could not analyze the decision.");
     } finally {
       setLoading(false);
     }
@@ -66,23 +115,29 @@ Keep each item concise (under 12 words). Be practical, grounded, and non-judgmen
     <section className="panel decision-panel">
       <div className="panel-header">
         <h2 className="panel-title">
-          <span className="panel-icon decision-icon">⚖</span>
+          <span className="panel-icon decision-icon">⚖️</span>
           Decision Helper
         </h2>
       </div>
 
-      <p className="panel-desc">Describe a decision you're weighing. Get a structured, calm breakdown.</p>
+      <p className="panel-desc">
+        Describe a decision you're weighing. Get a structured, calm breakdown.
+      </p>
 
       <textarea
         className="decision-input"
-        placeholder="e.g. Should I take the new job offer? It pays more but means longer commute…"
+        placeholder="e.g. Should I take the new job offer? It pays more but means a longer commute..."
         value={dilemma}
         onChange={(e) => setDilemma(e.target.value)}
-        rows={3}
+        rows={4}
       />
 
-      <button className="analyze-btn" onClick={analyze} disabled={loading || !dilemma.trim()}>
-        {loading ? "Analyzing…" : "Analyze Decision"}
+      <button
+        className="analyze-btn"
+        onClick={analyze}
+        disabled={loading || !dilemma.trim()}
+      >
+        {loading ? "Analyzing..." : "Analyze Decision"}
       </button>
 
       {error && <div className="decision-error">{error}</div>}
@@ -95,16 +150,21 @@ Keep each item concise (under 12 words). Be practical, grounded, and non-judgmen
             <div className="pros-col">
               <h3 className="col-label pros-label">For it</h3>
               <ul className="decision-list">
-                {result.pros.map((p, i) => (
-                  <li key={i} className="decision-li pros-li">{p}</li>
+                {result.pros?.map((p, i) => (
+                  <li key={i} className="decision-li pros-li">
+                    {p}
+                  </li>
                 ))}
               </ul>
             </div>
+
             <div className="cons-col">
               <h3 className="col-label cons-label">Against it</h3>
               <ul className="decision-list">
-                {result.cons.map((c, i) => (
-                  <li key={i} className="decision-li cons-li">{c}</li>
+                {result.cons?.map((c, i) => (
+                  <li key={i} className="decision-li cons-li">
+                    {c}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -115,7 +175,9 @@ Keep each item concise (under 12 words). Be practical, grounded, and non-judgmen
               <h3 className="col-label">Also consider</h3>
               <ul className="decision-list">
                 {result.considerations.map((c, i) => (
-                  <li key={i} className="decision-li consider-li">{c}</li>
+                  <li key={i} className="decision-li consider-li">
+                    {c}
+                  </li>
                 ))}
               </ul>
             </div>
