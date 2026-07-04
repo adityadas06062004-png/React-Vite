@@ -20,4 +20,4 @@ App runs at http://localhost:3000
 ## Notes
 
 - The Decision Helper calls the Anthropic API directly. Make sure your environment has the API key configured, or update `DecisionPanel.jsx` to use your backend proxy.
-- Built with React 18 + Vite. No other dependencies.
+- Built with React 18 + Vite. No other dependencies. 
